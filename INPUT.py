@@ -1,5 +1,5 @@
 
-input_flixster = {
+input_csv_flixster = {
     'csv_rating_path': 'H://Projects-SideProjects/SKY/flixster/ratings.txt',
     'csv_rating_opts': {
         'names': ['user_id', 'item_id', 'rating'],
@@ -23,4 +23,9 @@ input_kernelmf_01 = {
 
 input_train_ratio = 0.6
 
-input_rs = [1, 2, 3, 4, 5]
+input_rs = [0.5,
+            1.0, 1.5,
+            2.0, 2.5,
+            3.0, 3.5,
+            4.0, 4.5,
+            5.0]

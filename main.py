@@ -1,55 +1,32 @@
-import pickle
 
-from DRAFT import from_raw_to_datas, random_partition, mf_model, build_p_rating, indexing
-from INPUT import input_flixster, input_train_ratio, input_kernelmf_01, input_rs
+from DRAFT import load, save, new_model, get_data, prof
+from INPUT import input_csv_flixster, input_train_ratio, input_kernelmf_01, input_rs
 
 from curiosity import curiosity_scoring
 
-# data_rating, data_trust = from_raw_to_datas(input_flixster)
-#
-# index_train = random_partition(input_train_ratio, data_rating.index)
-#
-# data_rating_train = data_rating.loc[index_train]
-# data_rating_test = data_rating.drop(index_train)
-#
-# model = mf_model(input_kernelmf_01, data_rating_train)
-#
-# with open('./___model01.pickle', 'wb') as handle:
-#     pickle.dump(
-#         (data_rating, data_trust,
-#          index_train,
-#          data_rating_train, data_rating_test,
-#          model),
-#         handle)
+# TODO: Re-train model
 
-with open('./___model01.pickle', 'rb') as handle:
-    (data_rating, data_trust,
-     index_train,
-     data_rating_train, data_rating_test,
-     model) = pickle.load(handle)
+MODEL_PATH = './_model/___model02.pickle'
 
-data_p_rating = build_p_rating(model, data_rating)
+# index_train, model = new_model(input_csv_flixster, input_train_ratio, input_kernelmf_01)
+# save(MODEL_PATH, (index_train, model))
 
-ratings, ratings_iu, trusts, p_ratings = \
-    indexing(data_rating_train, data_trust, data_p_rating)
+index_train, model = load(MODEL_PATH)
+ratings_train, ratings_test, trusts, p_ratings = get_data(input_csv_flixster, index_train, model)
 
 scorings = curiosity_scoring(
-    lambda u: ratings.loc[u].index,
-    lambda i: ratings_iu.loc[i].index,
-    lambda u, i: ratings.loc[u, i][0],
-    lambda u, i: p_ratings.loc[u, i][0],
-    lambda u: trusts.loc[u].index,
+    ratings_train,
+    p_ratings,
+    trusts,
     input_rs
 )
 
 # NOTE: Create test user pool from test data
-# NOTE: Only users that got valid ss, us, cs pools can get recommended
+# NOTE: Only users that got valid test data and pools can get recommended
 
+def asdf(uid):
+    for i in scorings.item_pool(uid):
+        scorings.ss(uid, i)
 
-
-len(scorings.ss_pool(8))
-
-scorings.ss_pool(8)
-scorings.ss(8, 5124)
-scorings.us(8, 55304)
-
+prof(lambda: asdf(8), f'ss{8}.pstat')
+prof(lambda: asdf(11), f'ss{11}.pstat')
