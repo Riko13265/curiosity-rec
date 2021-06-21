@@ -54,6 +54,14 @@ def curiosity_scoring(
     s_u  = s_ui.index.droplevel(1).unique()
     s_iu = indexed_by_iu(s_ui)
 
+    @cache
+    def s_uiv(u):
+        sui = s_ui.rename_axis(index={'user_id': 'u'})
+        siv = s_iu.rename_axis(index={'user_id': 'v'})
+        return sui.loc[u].merge(siv, left_index=True, right_index=True) \
+            .reorder_levels(['v', 'item_id']) \
+            .sort_index().loc[trusts.loc[u].index]
+
     def rating(u, i):
         return ratings.loc[u, i][0]
 
@@ -82,10 +90,21 @@ def curiosity_scoring(
             return items_surprising(u).intersection(items_surprising(v))
 
     @cache
+    def items_surprising_both_v2(u, v):
+        if u > v:
+            return items_surprising_both(v, u)
+        else:
+            return s_uiv(u).loc[v]
+
+    @cache
     def correlated_friends(u):
         return filter_index(
             friends(u).intersection(s_u),
             lambda v: len(items_surprising_both(u, v)) > 0.)
+
+    @cache
+    def correlated_friends_v2(u):
+        return s_uiv(u).index.droplevel(1).unique()
 
     r_m = max(rs) - min(rs)
 
@@ -106,7 +125,7 @@ def curiosity_scoring(
                len(fseff)
 
     def ss_pool(u):
-        return correlated_friends(u).rename('v').join(
+        return correlated_friends_v2(u).rename('v').join(
             s_ui.index.rename(['v', 'item_id']),
             how='inner'
         ).droplevel(0).unique().sort_values()
