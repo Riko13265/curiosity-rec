@@ -1,23 +1,18 @@
 import math
 from functools import cache
-from typing import NamedTuple, Set, Callable, List
+from typing import NamedTuple, Callable, List
 
 import pandas as pd
 
-IdIdInt = Callable[[int, int], int]
-
-IdIdFloat = Callable[[int, int], float]
-
-IdToIdSet = Callable[[int], Set[int]]
-
+IdToSeries = Callable[[int], pd.Series]
 IdToIndex = Callable[[int], pd.Index]
 
 
 class CuriosityScoring(NamedTuple):
-    ss: IdIdFloat
-    us: IdIdFloat
-    cs: IdIdFloat
-    item_pool: IdToIdSet
+    ss: IdToSeries
+    us: IdToSeries
+    cs: IdToSeries
+    item_pool: IdToIndex
 
 
 def indexed_by_iu(df):
@@ -46,12 +41,8 @@ def curiosity_scoring(
         trusts: pd.DataFrame,
         rs: List[int]
 ):
-    ratings_iu = indexed_by_iu(ratings)
-
     r_sub_pr = (ratings - p_ratings).dropna()
-
     s_ui = r_sub_pr[r_sub_pr['rating'] > 0.]
-    s_u  = s_ui.index.droplevel(1).unique()
     s_iu = indexed_by_iu(s_ui)
 
     @cache
@@ -62,112 +53,75 @@ def curiosity_scoring(
             .reorder_levels(['v', 'item_id']) \
             .sort_index().loc[trusts.loc[u].index]
 
-    def rating(u, i):
-        return ratings.loc[u, i][0]
-
-    def users_rated(i):
-        return safe_loc_index(ratings_iu, i)
-
-    def friends(u):
-        return safe_loc_index(trusts, u)
-
-    def surprise(u, i):
-        return s_ui.loc[u, i][0]
-
-    def users_surprised_by(i):
-        return s_iu.loc[i].index
-        # return safe_loc_index(s_iu, i)
-
-    def items_surprising(u):
-        return s_ui.loc[u].index
-
-
-    @cache
-    def items_surprising_both(u, v):
-        if u > v:
-            return items_surprising_both(v, u)
-        else:
-            return items_surprising(u).intersection(items_surprising(v))
-
-    @cache
-    def items_surprising_both_v2(u, v):
-        if u > v:
-            return items_surprising_both(v, u)
-        else:
-            return s_uiv(u).loc[v]
-
-    @cache
     def correlated_friends(u):
-        return filter_index(
-            friends(u).intersection(s_u),
-            lambda v: len(items_surprising_both(u, v)) > 0.)
-
-    @cache
-    def correlated_friends_v2(u):
         return s_uiv(u).index.droplevel(1).unique()
 
     r_m = max(rs) - min(rs)
 
+    def sc(u):
+        suivu = s_uiv(u)
+        diff = abs(suivu['rating_x'] - suivu['rating_y'])
+        return (1. - diff.groupby('v').sum() / diff.groupby('v').agg('count') / r_m).to_frame(name='sc')
+
+    def ss(u):
+        siv_sc = sc(u).merge(
+            s_ui.rename_axis(index={'user_id': 'v'}),
+            left_index=True, right_index=True
+        )
+        s_sc = (siv_sc['rating'] * siv_sc['sc'])
+        return s_sc.groupby('item_id').sum() / s_sc.groupby('item_id').agg('count')
+
     @cache
-    def sc(u, v):
-        if u > v:
-            return sc(v, u)
-        else:
-            return 1 - sum(abs(surprise(u, i) - surprise(v, i)) for i in items_surprising_both(u, v)) / \
-                   (len(items_surprising_both(u, v)) * r_m)
-
-    def friends_surprised_by(u, i):
-        return correlated_friends(u).intersection(users_surprised_by(i))
-
-    def ss(u, i):
-        fseff = friends_surprised_by(u, i)
-        return sum(sc(u, v) * surprise(v, i) for v in fseff) / \
-               len(fseff)
-
     def ss_pool(u):
-        return correlated_friends_v2(u).rename('v').join(
+        return correlated_friends(u).rename('v').join(
             s_ui.index.rename(['v', 'item_id']),
             how='inner'
         ).droplevel(0).unique().sort_values()
 
     @cache
-    def friends_rated(u, i):
-        return friends(u).intersection(users_rated(i))
+    def v_ir(u):
+        return trusts.loc[u].merge(
+            ratings.rename_axis(index={'user_id': 'v'}), left_index=True, right_index=True) \
+            .reset_index().set_index(['item_id', 'rating']).sort_index()
 
-    def c(u, i, j):
-        return len(filter_index(
-            friends_rated(u, i),
-            lambda v: rating(v, i) == j))
+    def c_ir(u):
+        return v_ir(u).groupby(['item_id', 'rating']).agg('count')
 
     @cache
-    def c_sum(u, i):
-        return len(friends_rated(u, i))
+    def c_i(u):
+        return v_ir(u).groupby(['item_id']).agg('count')
 
-    def p(u, i, j):
-        return c(u, i, j) / \
-               c_sum(u, i)
+    def p_ir(u):
+        return c_ir(u) / c_i(u)
 
-    def se(u, i):
-        return - sum(xlogx(p(u, i, j)) for j in rs)
+    def se_i(u):
+        return - p_ir(u).applymap(xlogx).groupby(['item_id']).sum()
 
     r = len(rs)
 
-    def ds(u, i):
-        return r / (c_sum(u, i) + r)
+    def ds_i(u):
+        return r / (c_i(u) + r)
 
-    def us(u, i):
-        return (1. - ds(u, i)) * se(u, i)
+    def us(u):
+        return ((1. - ds_i(u)) * se_i(u)).loc[ss_pool(u)]['v']
 
     # NOTE: CS
 
-    # Caution: Could be None!
-    def cs(u, i):
-        fri = friends_rated(u, i)
-        len_fri = len(fri)
-        r_avg = sum(rating(v, i) for v in fri) / len_fri
-        return math.sqrt(
-            sum(pow(rating(v, i) - r_avg, 2) for v in fri) /
-            len_fri)
+    @cache
+    def r_iv(u):
+        return trusts.loc[u].merge(
+            ratings.rename_axis(index={'user_id': 'v'}), left_index=True, right_index=True) \
+            .reorder_levels(['item_id', 'v']).sort_index()
+
+    def r_avg_i(u):
+        return r_iv(u).groupby('item_id').mean()
+
+    def cs(u):
+        return (r_iv(u) - r_avg_i(u)) \
+            .applymap(lambda x: pow(x, 2)) \
+            .groupby('item_id').mean() \
+            .applymap(math.sqrt) \
+            .loc[ss_pool(u)]['rating']
 
     return CuriosityScoring(
         ss,

@@ -1,8 +1,7 @@
-
 from DRAFT import load, save, new_model, get_data, prof
 from INPUT import input_csv_flixster, input_train_ratio, input_kernelmf_01, input_rs
 
-from curiosity import curiosity_scoring, indexed_by_iu
+from curiosity import curiosity_scoring
 
 # TODO: Re-train model
 
@@ -21,20 +20,13 @@ scorings = curiosity_scoring(
     input_rs
 )
 
-# # NOTE: Create test user pool from test data
-# # NOTE: Only users that got valid test data and pools can get recommended
-#
-# def asd(uid):
-#     print(scorings.item_pool(uid))
-#
-# def asdf(uid):
-#     for i in scorings.item_pool(uid):
-#         print(scorings.ss(uid, i))
-#
-# prof(lambda: asdf(8), f'ss{8}.pstat')
-# prof(lambda: asdf(11), f'ss{11}.pstat')
-#
-# prof(lambda: asd(8), f'spool{8}.pstat')
-# prof(lambda: asd(11), f'spool{11}.pstat2')
-#
-# scorings.item_pool(8).to_list()
+# NOTE: Create test user pool from test data
+# NOTE: Only users that got valid test data and pools can get recommended
+
+prof(lambda: print(scorings.ss(11)), f'v2_ss_{11}.pstat')
+prof(lambda: print(scorings.us(11)), f'v2_us_{11}.pstat')
+prof(lambda: print(scorings.cs(11)), f'v2_cs_{11}.pstat')
+
+prof(lambda: print(scorings.ss(8)), f'v2_ss_{8}.pstat')
+prof(lambda: print(scorings.us(8)), f'v2_us_{8}.pstat')
+prof(lambda: print(scorings.cs(8)), f'v2_cs_{8}.pstat')
