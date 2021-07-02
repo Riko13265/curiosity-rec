@@ -1,9 +1,13 @@
 import pickle
 from random import shuffle
+from typing import NamedTuple
+
 from matrix_factorization import KernelMF
 from pandas import read_csv
 
 import cProfile
+
+from borda_count import borda_count
 
 pr = cProfile.Profile()
 
@@ -77,7 +81,28 @@ def indexing(index_train, data_rating, data_trust, data_p_rating):
     return ratings_train, ratings_test, trusts, p_ratings
 
 
-def get_data(input_csv, index_train, model):
-    data_rating, data_trust = from_raw_to_datas(input_csv)
+def get_data(data_rating, data_trust, index_train, model):
+    # data_rating, data_trust = from_raw_to_datas(input_csv)
     data_p_rating = build_p_rating(model, data_rating)
     return indexing(index_train, data_rating, data_trust, data_p_rating)
+
+
+import pandas as pd
+
+
+def recommendation(curiosity, cf):
+    def rec(u):
+        try:
+            return borda_count(curiosity.score(u), cf.score(u), 0.5)
+        except KeyError:
+            return pd.Series([], dtype=int).rename('item_id')
+    return rec
+
+
+def rank_in_test(ratings_test):
+    def test(u):
+        try:
+            return ratings_test.loc[u].reset_index()['item_id']
+        except KeyError:
+            return pd.Series([], dtype=int).rename('item_id')
+    return test
