@@ -15,7 +15,13 @@ input_csv_flixster = {
         'names': ['u', 'v'],
         'sep': '\t', 'index_col': False
     },
-    'trust_u_column': 'u'
+    'trust_u_column': 'u',
+    'rs': [0.5,
+           1.0, 1.5,
+           2.0, 2.5,
+           3.0, 3.5,
+           4.0, 4.5,
+           5.0]
 }
 
 input_kernelmf_01 = {
@@ -28,9 +34,3 @@ input_kernelmf_01 = {
 
 input_train_ratio = 0.6
 
-input_rs = [0.5,
-            1.0, 1.5,
-            2.0, 2.5,
-            3.0, 3.5,
-            4.0, 4.5,
-            5.0]

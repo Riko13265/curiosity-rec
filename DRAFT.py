@@ -1,5 +1,5 @@
 import pickle
-from random import shuffle
+from random import shuffle, sample
 from typing import NamedTuple
 
 from matrix_factorization import KernelMF
@@ -53,8 +53,7 @@ def mf(input_mf, data_rating_train):
     return model
 
 
-def new_model(input_csv, input_train_ratio, input_mf_params):
-    data_rating, _ = from_raw_to_datas(input_csv)
+def new_model(data_rating, input_train_ratio, input_mf_params):
     index_train = random_partition(input_train_ratio, data_rating.index)
     data_rating_train = data_rating.loc[index_train]
     model = mf(input_mf_params, data_rating_train)
@@ -90,10 +89,10 @@ def get_data(data_rating, data_trust, index_train, model):
 import pandas as pd
 
 
-def recommendation(curiosity, cf):
+def recommendation(curiosity_score, cf_score):
     def rec(u):
         try:
-            return borda_count(curiosity.score(u), cf.score(u), 0.5)
+            return borda_count(curiosity_score(u), cf_score(u), 0.5)
         except KeyError:
             return pd.Series([], dtype=int).rename('item_id')
     return rec
@@ -106,3 +105,12 @@ def rank_in_test(ratings_test):
         except KeyError:
             return pd.Series([], dtype=int).rename('item_id')
     return test
+
+
+def generate_vusers(group_count, group_size, user_pool):
+    return pd.DataFrame(data=[(-group_count + vu, u)
+                              for vu in range(group_count)
+                              for u in sample(user_pool, group_size)
+                              ]) \
+        .rename(columns={0: 'vuser_id', 1: 'user_id'}) \
+        .set_index(['vuser_id', 'user_id'])

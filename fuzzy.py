@@ -19,13 +19,6 @@ def rule_y(x1, x2, x3):
     return rule_y_values[x1 + x2 + x3]
 
 
-# def gauss(x, avg, std):
-#     n = (x - avg) / std
-#     if abs(n) > 5:
-#         return 0.
-#     return exp(- pow(n, 2.))
-
-
 def gauss(delta, std):
     n = delta / std
     if abs(n) > 5:
